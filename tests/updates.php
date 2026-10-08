@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__).'/vendor/autoload.php';
+$source=$argv[2]??dirname(__DIR__);require $source.'/vendor/autoload.php';
 use Okp\Update\{Engine,Package,Remote};
-$source=dirname(__DIR__);$application=require $source.'/bootstrap.php';if($application->config->production()||!str_ends_with($application->config->values['db']['database'],'_test'))throw new RuntimeException('Updater tests require an isolated development *_test database');$fixture=$argv[1]??'';if(!is_file($fixture.'/update-manifest.json'))throw new RuntimeException('Pass an isolated fixture build directory');
+$application=require $source.'/bootstrap.php';if($application->config->production()||!str_ends_with($application->config->values['db']['database'],'_test'))throw new RuntimeException('Updater tests require an isolated development *_test database');$fixture=$argv[1]??'';if(!is_file($fixture.'/update-manifest.json'))throw new RuntimeException('Pass an isolated fixture build directory');
 $workspace=dirname($source).'/.local/update-tests-'.bin2hex(random_bytes(5));mkdir($workspace,0700,true);$count=0;
 function assertUpdate(bool $condition,string $message):void{global $count;if(!$condition)throw new RuntimeException('FAIL '.$message);$count++;echo "PASS $message\n";}
 function denied(callable $fn,string $message):void{try{$fn();}catch(Throwable){assertUpdate(true,$message);return;}assertUpdate(false,$message);}
