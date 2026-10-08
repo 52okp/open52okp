@@ -1,0 +1,1 @@
+<section class="card narrow"><h1>保存恢复码</h1><p>二次验证已开启。恢复码仅显示一次，每个只能使用一次；请保存在安全的离线位置。</p><div class="secret"><?php foreach($codes as $code): ?><div><?= $e($code) ?></div><?php endforeach ?></div><p><a class="button" href="/account">我已保存</a></p></section>

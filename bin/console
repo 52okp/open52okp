@@ -1,0 +1,23 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+if(PHP_SAPI!=='cli')exit(1);
+require dirname(__DIR__).'/vendor/autoload.php';
+$command=$argv[1]??'help';$root=dirname(__DIR__);
+function prompt(string $label,bool $secret=false):string {
+ fwrite(STDOUT,$label.': ');
+ if($secret&&PHP_OS_FAMILY!=='Windows'){
+  if(!function_exists('shell_exec'))throw new RuntimeException('隐藏密码输入需要 CLI shell_exec；可使用 ADMIN_PASSWORD_FILE 指向仅自己可读的密码文件');
+  $state=shell_exec('stty -g');if(!$state)throw new RuntimeException('请在交互终端运行或使用 ADMIN_PASSWORD_FILE');shell_exec('stty -echo');try{$value=trim(fgets(STDIN));}finally{shell_exec('stty '.escapeshellarg(trim($state)));fwrite(STDOUT,PHP_EOL);}return $value;
+ }
+ if($secret)throw new RuntimeException('Windows 请通过 ADMIN_PASSWORD_FILE 指定临时密码文件，避免回显');return trim(fgets(STDIN));
+}
+try {
+ if(!in_array($command,['install','admin:create','check','cleanup'],true)){echo "52okp PHP 账号中心\n  install       初始化密钥和数据库（不删除数据）\n  admin:create  创建管理员（邮箱由交互或 ADMIN_EMAIL 提供）\n  check         检查运行环境\n  cleanup       清理过期票据和 30 天前日志\n";exit(0);}
+ if($command==='install')\Okp\Installer::prepare($root);
+ $a=require $root.'/bootstrap.php';
+ if($command==='install'){\Okp\Installer::schema($a);echo "数据库与密钥初始化完成。下一步运行 admin:create。\n";}
+ elseif($command==='admin:create'){$email=getenv('ADMIN_EMAIL')?:prompt('管理员邮箱');$file=getenv('ADMIN_PASSWORD_FILE');$password=$file?rtrim(file_get_contents($file),"\r\n"):prompt('管理员密码（至少 12 位，含大小写和数字）',true);$u=$a->users->create($email,$password,'管理员');$a->db->run("UPDATE users SET role='admin' WHERE id=?",[$u['id']]);echo "管理员创建成功，请访问 /login?target=/admin。\n";}
+ elseif($command==='check'){$a->db->one('SELECT version FROM schema_versions WHERE version=1');$a->oauth()->jwt->jwks();foreach(['pdo_mysql','openssl','sodium','mbstring','curl'] as $ext)if(!extension_loaded($ext))throw new RuntimeException('缺少扩展 '.$ext);if(!is_writable($a->config->path('storage/sessions')))throw new RuntimeException('会话目录不可写');echo 'PHP '.PHP_VERSION.' / MySQL '.$a->db->one('SELECT VERSION() AS version')['version']."\n";echo 'Issuer: '.$a->config->issuer()."\n运行环境检查通过。\n";}
+ else{foreach(['login_requests','email_codes','auth_codes','refresh_tokens','access_tokens'] as $table)$a->db->run('DELETE FROM '.$table.' WHERE expires_at<? LIMIT 10000',[time()-86400]);$a->db->run('DELETE FROM rate_limits WHERE window_start<? LIMIT 10000',[time()-86400]);$a->db->run('DELETE FROM audit_events WHERE created_at<? LIMIT 10000',[time()-2592000]);echo "过期记录清理完成。\n";}
+}catch(Throwable $e){fwrite(STDERR,'操作失败：'.($e instanceof \PDOException?'数据库操作失败，请核对连接、权限和表结构':$e->getMessage()).PHP_EOL);exit(1);}

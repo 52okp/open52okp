@@ -1,0 +1,1 @@
+<section class="card narrow"><h1>确认退出</h1><p>退出后，该账号在登录中枢签发的旧凭证将失效。业务网站还需清理自己的本地会话。</p><form method="post"><input type="hidden" name="csrf" value="<?= $e($csrf) ?>"><button>确认退出</button></form><p><a href="/account">取消</a></p></section>

@@ -1,0 +1,1 @@
+<section class="card narrow"><h1><?= $e($title) ?></h1><p class="error" role="alert"><?= $e($message) ?></p><div class="actions"><a class="button" href="/login">重新登录</a><a href="/account">返回账号中心</a></div></section>

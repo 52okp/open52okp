@@ -1,0 +1,1 @@
+<section class="card narrow"><h1>保存应用密钥</h1><p>应用：<?= $e($clientId) ?>。密钥只显示这一次，请存入业务网站服务端配置，勿放入网页或小程序。</p><code class="secret"><?= $e($secret) ?></code><p><a href="/admin">返回管理后台</a></p></section>

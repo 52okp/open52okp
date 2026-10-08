@@ -1,0 +1,1 @@
+<section class="card narrow"><h1>二次验证</h1><?php if($error): ?><p class="error"><?= $e($error) ?></p><?php endif ?><p>输入验证器上的动态验证码，或一个未使用的恢复码。</p><form method="post"><input type="hidden" name="csrf" value="<?= $e($csrf) ?>"><label>验证码 / 恢复码<input name="code" required autocomplete="one-time-code" maxlength="32"></label><button>验证并继续</button></form></section>
