@@ -58,3 +58,5 @@ Discovery：`https://open.52okp.com/realms/52okp/.well-known/openid-configuratio
 - GET `/status/{ticket}?key=...`：网页每 3 秒查询状态；不重复向微信生成二维码。
 
 微信 access_token 与二维码内容加锁缓存；微信拒绝、配置错误、应用自己的限流会显示错误，不伪造二维码成功状态。同一个 ticket 只能确认、消费一次，且网页消费必须绑定原浏览器。微信绑定只允许已登录的目标账号，不按相同邮箱或昵称自动合并账号。
+
+1.0.5 起，表单完成后先显示本站继续页面，由页面自动导航到已校验的应用回调。此设计兼容浏览器 form-action 限制；禁用 JavaScript 时可点击“返回应用”继续。业务应用最终接收的 code/state 或 error/state 参数不变。

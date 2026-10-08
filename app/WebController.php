@@ -40,11 +40,18 @@ final class WebController {
   if($u['totp_secret']){$_SESSION['pending_otp']=['user'=>$u['id'],'version'=>(int)$u['session_version'],'payload'=>json_decode($t['payload'],true),'expires'=>time()+300];return Http::redirect('/login/otp');}
   return $this->finish($u,json_decode($t['payload'],true),$r);
  }
+ private function browserRedirect(ResponseInterface $response):ResponseInterface {
+  // Chromium applies form-action 'self' to cross-origin redirects after a POST.
+  // Destinations here come only from validated OAuth callbacks or stored logout targets.
+  $destination=$response->getHeaderLine('Location');
+  if(in_array($response->getStatusCode(),[302,303],true)&&preg_match('#^https?://#i',$destination))return $this->a->view->render('continue',['title'=>'正在返回应用','destination'=>$destination,'destinationHost'=>parse_url($destination,PHP_URL_HOST)]);
+  return $response;
+ }
  private function finish(array $u,array $payload,Request $r):ResponseInterface {
   return $this->a->db->transaction(function()use($u,$payload,$r){$version=$u['session_version'];$u=$this->a->users->byId($u['id'],true);if(!$u||!$u['enabled']||$u['session_version']!==$version)throw new Problem('账号不可用',403);
   // Complete the authorization before exposing any redirect; the library revalidates the client/callback.
   $response=isset($payload['oauth'])?$this->a->oauth()->complete($payload['oauth'],$u['id'],$r):Http::redirect($payload['return']??'/account');
-  $this->a->browser->login($u);unset($_SESSION['pending_otp']);$this->a->audit->log('login.success',$u['id'],$this->ip($r));return $response;});
+  $this->a->browser->login($u);unset($_SESSION['pending_otp']);$this->a->audit->log('login.success',$u['id'],$this->ip($r));return $this->browserRedirect($response);});
  }
  public function otp(Request $r):ResponseInterface {
   $p=$_SESSION['pending_otp']??null;if(!$p||$p['expires']<=time())throw new Problem('验证请求已失效，请重新登录',410);
@@ -55,7 +62,7 @@ final class WebController {
   $t=$this->a->requests->bound(Http::input($r,'request'),$this->a->browser->binding(),false,true);if(!in_array($t['state'],['WAITING','CONFIRMED','CANCELLED'],true))throw new Problem('请重新发起登录',409);$this->a->requests->cancel($t['id'],$this->a->browser->binding());
   $new=$this->a->requests->create($this->a->browser->binding(),json_decode($t['payload'],true),$t['client_name'],$this->ip($r),$t['intent'],$t['target_user']);$this->remember($new);return Http::redirect('/login?request='.$new['ticket']['id']);
  }
- public function cancel(Request $r):ResponseInterface {$id=Http::input($r,'request');$t=$this->a->requests->bound($id,$this->a->browser->binding());$this->a->requests->cancel($id,$this->a->browser->binding());$payload=json_decode($t['payload'],true);if(isset($payload['oauth'])){$q=$payload['oauth'];$this->a->oauth()->validate($r->withQueryParams($q));return Http::redirect($q['redirect_uri'].(str_contains($q['redirect_uri'],'?')?'&':'?').http_build_query(['error'=>'access_denied','state'=>$q['state']]));}return Http::redirect('/');}
+ public function cancel(Request $r):ResponseInterface {$id=Http::input($r,'request');$t=$this->a->requests->bound($id,$this->a->browser->binding());$this->a->requests->cancel($id,$this->a->browser->binding());$payload=json_decode($t['payload'],true);if(isset($payload['oauth'])){$q=$payload['oauth'];$this->a->oauth()->validate($r->withQueryParams($q));return $this->browserRedirect(Http::redirect($q['redirect_uri'].(str_contains($q['redirect_uri'],'?')?'&':'?').http_build_query(['error'=>'access_denied','state'=>$q['state']])));}return Http::redirect('/');}
  public function emailForm(Request $r,string $purpose):ResponseInterface {
   return $this->a->view->render('email-form',['title'=>$purpose==='register'?'注册账号':'找回密码','purpose'=>$purpose]);
  }
@@ -94,7 +101,7 @@ final class WebController {
  public function linkWechat(Request $r):ResponseInterface {$u=$this->requireUser();$this->recent($u);if(!$this->a->wechat->enabled())throw new Problem('微信绑定尚未配置');$new=$this->a->requests->create($this->a->browser->binding(),['return'=>'/account','target_version'=>(int)$u['session_version']],'52okp 账号中心 · 绑定微信',$this->ip($r),'LINK',$u['id']);$this->remember($new);return Http::redirect('/login?request='.$new['ticket']['id']);}
  public function logout(Request $r):ResponseInterface {$u=$this->a->users->current();if($u)$this->a->db->transaction(fn()=>$this->a->users->revokeSessions($u['id']));$this->a->browser->logout();return Http::redirect('/');}
  public function endSession(Request $r):ResponseInterface {
-  if($r->getMethod()==='POST'){$target=$_SESSION['logout_target']??'/';unset($_SESSION['logout_target']);$this->logout($r);return Http::redirect($target);}
+  if($r->getMethod()==='POST'){$target=$_SESSION['logout_target']??'/';unset($_SESSION['logout_target']);$this->logout($r);return $this->browserRedirect(Http::redirect($target));}
   $target='/';$redirect=Http::query($r,'post_logout_redirect_uri');$hint=Http::query($r,'id_token_hint');
   if($redirect!==''&&$hint!==''){$token=$this->a->oauth()->jwt->verify($hint,'JWT',true);$aud=$token->claims()->get('aud');$client=$this->a->db->one('SELECT * FROM clients WHERE id=? AND enabled=1',[$aud[0]??'']);if(!$client||!in_array($redirect,json_decode($client['logout_uris'],true),true))throw new Problem('退出回调未登记');$current=$this->a->users->current();if($current&&$token->claims()->get('sub')!==$current['id'])throw new Problem('退出凭证与当前账号不匹配',403);$target=$redirect;$state=Http::query($r,'state');if($state!=='')$target.=(str_contains($target,'?')?'&':'?').http_build_query(['state'=>$state]);}
   elseif($redirect!=='')throw new Problem('跳转退出回调需要有效 id_token_hint');$_SESSION['logout_target']=$target;

@@ -41,6 +41,7 @@ final class Application {
     foreach([$r->getUri()->getQuery(),str_starts_with(strtolower($r->getHeaderLine('Content-Type')),'application/x-www-form-urlencoded')?(string)$r->getBody():''] as $raw){$seen=[];foreach(explode('&',$raw) as $pair){if($pair==='')continue;$key=urldecode(explode('=',$pair,2)[0]);if(isset($seen[$key])||!preg_match('/^[a-zA-Z0-9_-]+$/',$key))throw new Problem('重复或数组参数不被支持');$seen[$key]=true;}}
     if(!$api){$this->browser->start();if($r->getMethod()==='POST'){$raw=(string)$r->getBody();parse_str($raw,$body);$this->browser->check($r->getHeaderLine('X-CSRF-Token')?:($body['csrf']??null));}}
     $response=$handler->handle($r);
+
    }catch(\League\OAuth2\Server\Exception\OAuthServerException $e){$response=$e->generateHttpResponse(new Response());}
    catch(\Throwable $e){$status=$e instanceof Problem?$e->status:($e instanceof \Slim\Exception\HttpException?$e->getCode():500);if($status<400||$status>599)$status=500;$message=$status===500?'服务暂时不可用，请联系管理员':($e instanceof Problem?$e->getMessage():'页面或请求方法不存在');
     if($status===500){$id=bin2hex(random_bytes(6));error_log(date('c').' '.$id.' '.get_class($e).' '.$e->getFile().':'.$e->getLine().PHP_EOL,3,$this->config->path('storage/error.log'));$message.='（编号 '.$id.'）';}

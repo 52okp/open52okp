@@ -1,0 +1,1 @@
+<section class="card narrow"><p class="eyebrow">CONTINUE</p><h1>正在返回应用</h1><p>即将返回 <?= $e($destinationHost) ?>，请稍候。</p><p class="muted">如果页面没有自动跳转，点击下方按钮继续。</p><a class="button" data-login-redirect href="<?= $e($destination) ?>" rel="noreferrer">返回应用</a></section>
