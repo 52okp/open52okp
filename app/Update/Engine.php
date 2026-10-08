@@ -22,7 +22,10 @@ final class Engine {
  }
  private function mutex(){ $h=fopen($this->dir.'/worker.lock','c');if(!$h||!flock($h,LOCK_EX|LOCK_NB)){if(is_resource($h))fclose($h);throw new RuntimeException('已有更新任务正在执行');}return $h; }
  public function enqueue(array $release):string {
-  $lock=$this->mutex();try{if(!$this->idle())throw new RuntimeException('已有待处理任务，请等待或检查计划任务');$this->preflight();$v=$this->identity();if($release['product']!==$v['product']||$release['from']!==$v['version'])throw new RuntimeException('起始版本不匹配，请重新检查更新');$id=bin2hex(random_bytes(12));$s=['id'=>$id,'version'=>$release['version'],'release'=>$release,'phase'=>'queued','created_at'=>time(),'updated_at'=>time(),'history'=>[],'bytes'=>0,'total'=>$release['size']];$this->phase($s,'queued','已排队，等待宝塔计划任务执行');return $id;}finally{flock($lock,LOCK_UN);fclose($lock);}
+  $lock=$this->mutex();try{if(!$this->idle())throw new RuntimeException('已有待处理任务，请查看执行状态');$this->preflight();$v=$this->identity();if($release['product']!==$v['product']||$release['from']!==$v['version'])throw new RuntimeException('起始版本不匹配，请重新检查更新');$id=bin2hex(random_bytes(12));$s=['id'=>$id,'version'=>$release['version'],'release'=>$release,'phase'=>'queued','created_at'=>time(),'updated_at'=>time(),'history'=>[],'bytes'=>0,'total'=>$release['size']];$this->phase($s,'queued','任务已创建，正在启动后台安装');return $id;}finally{flock($lock,LOCK_UN);fclose($lock);}
+ }
+ public function failQueued(string $id,string $message):void {
+  $lock=$this->mutex();try{$s=$this->state();if(($s['id']??'')===$id&&($s['phase']??'')==='queued')$this->phase($s,'failed',$message);}finally{flock($lock,LOCK_UN);fclose($lock);}
  }
  private function safe(string $name):string {
   if(!Package::allowed($name))throw new RuntimeException('更新目标超出代码白名单');$at=$this->root;foreach(explode('/',$name) as $part){$at.='/'.$part;if(is_link($at))throw new RuntimeException('更新路径包含符号链接');}return $at;
@@ -61,7 +64,7 @@ final class Engine {
    foreach($new as $name=>$hash)$this->copy($job.'/stage/'.$name,$this->safe($name),$hash);
    foreach($old as $name=>$hash)if(!isset($new[$name])&&!unlink($this->safe($name)))throw new RuntimeException('旧代码文件清理失败');
    $this->phase($s,'health','正在独立进程中检查新版本与数据库连接');if($health)$health();else $this->health();$this->phase($s,'complete','更新成功，已保留上一个版本的代码备份');unlink($this->root.'/storage/update-maintenance');
-  }catch(\Throwable $e){if(isset($s)&&$s){$message=$e instanceof RuntimeException?$e->getMessage():'更新失败，请检查任务目录与权限';if(isset($job)&&is_file($job.'/journal.json')){try{$this->phase($s,'recovering',$message.'；准备恢复旧代码');$gate??=$this->maintenance();$this->restore($s,$job,$health);unlink($this->root.'/storage/update-maintenance');}catch(\Throwable){$this->phase($s,'recovery_required','自动恢复尚未成功，保持维护状态；修复磁盘或权限后重新运行计划任务');}}else{$this->phase($s,'failed',$message);if(is_file($this->root.'/storage/update-maintenance'))unlink($this->root.'/storage/update-maintenance');}}}
+  }catch(\Throwable $e){if(isset($s)&&$s){$message=$e instanceof RuntimeException?$e->getMessage():'更新失败，请检查任务目录与权限';if(isset($job)&&is_file($job.'/journal.json')){try{$this->phase($s,'recovering',$message.'；准备恢复旧代码');$gate??=$this->maintenance();$this->restore($s,$job,$health);unlink($this->root.'/storage/update-maintenance');}catch(\Throwable){$this->phase($s,'recovery_required','自动恢复尚未成功，保持维护状态；修复磁盘或权限后按更新文档执行恢复');}}else{$this->phase($s,'failed',$message);if(is_file($this->root.'/storage/update-maintenance'))unlink($this->root.'/storage/update-maintenance');}}}
   finally{if(is_resource($gate)){flock($gate,LOCK_UN);fclose($gate);}flock($lock,LOCK_UN);fclose($lock);}
  }
  private function maintenance(){self::atomic($this->root.'/storage/update-maintenance','1');$gate=fopen($this->root.'/storage/update-gate.lock','c');if(!$gate||!flock($gate,LOCK_EX))throw new RuntimeException('无法进入维护窗口');return $gate;}
