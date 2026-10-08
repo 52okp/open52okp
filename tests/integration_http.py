@@ -25,6 +25,18 @@ def request(path,data=None,raw=None):
  except urllib.error.HTTPError as e:r=e
  return r.code,r.read().decode('utf-8'),r.headers
 def field(body,key):return html.unescape(re.search(r'name="'+key+r'" value="([^"]*)"',body).group(1))
+s,b,h=request('/api');check(s==200 and '接入 52okp 统一登录' in b and 'php-authorize' in b,'API documentation is public and includes integration examples')
+page=b
+s,b,h=request('/api/spec');spec=json.loads(b);check(s==200 and spec['authorization']['pkce_required_for_all_clients'] and 'Set-Cookie' not in h,'public JSON spec needs no login or session cookie')
+s,b,h=request('/realms/52okp/.well-known/openid-configuration');check(spec['discovery']==json.loads(b),'documented endpoints match live OIDC discovery')
+for asset in re.findall(r'(?:href|src)="(/assets/api-docs[^"]+)"',page):
+ s,b,h=request(asset);check(s==200,'API documentation asset available')
+example=html.unescape(re.search(r'<code id="php-authorize">(.*?)</code>',page,re.S).group(1))
+import tempfile
+with tempfile.TemporaryDirectory() as temp:
+ path=Path(temp)/'authorize.php';path.write_bytes(example.encode('utf-8'))
+ result=subprocess.run([PHP,'-l',str(path)],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ check(result.returncode==0,'rendered PHP authorization example has valid syntax')
 seed=worker({'action':'seed'})
 s,b,h=request('/');check(s==200 and '账号中心' in b,'home renders');check(h['Cache-Control']=='no-store','HTML not cached')
 s,b,h=request('/admin');check(s==401,'admin requires login')

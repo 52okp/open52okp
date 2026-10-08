@@ -15,6 +15,7 @@ final class Application {
   foreach(['/login/password'=>'password','/login/finish'=>'qrFinish','/login/refresh'=>'refresh','/login/cancel'=>'cancel','/email/send'=>'sendCode','/register'=>'register','/forgot-password'=>'resetPassword','/account/profile'=>'profile','/account/password'=>'changePassword','/account/email'=>'linkEmail','/account/wechat'=>'linkWechat','/logout'=>'logout'] as $path=>$method)$app->post($path,fn($r)=>$web->$method($r));
   $app->map(['GET','POST'],'/login/otp',fn($r)=>$web->otp($r));$app->map(['GET','POST'],'/account/totp',fn($r)=>$web->totp($r));
   $app->get('/register',fn($r)=>$web->emailForm($r,'register'));$app->get('/forgot-password',fn($r)=>$web->emailForm($r,'reset'));
+  $docs=new ApiDocs($this);$app->get('/api',fn($r)=>$docs->page());$app->get('/api/spec',fn($r)=>Http::json($docs->spec()));
   $app->get('/privacy',fn($r)=>$this->view->render('privacy',['title'=>'账号与隐私说明']));
   $app->get('/admin',fn($r)=>$admin->index($r));$app->post('/admin/user',fn($r)=>$admin->user($r));$app->post('/admin/client',fn($r)=>$admin->client($r));$app->post('/admin/settings',fn($r)=>$admin->settings($r));
   $updates=new UpdatesController($this);$app->get('/admin/updates',fn($r)=>$updates->index($r));$app->get('/admin/updates/status',fn($r)=>$updates->status($r));foreach(['configure','check','install'] as $action)$app->post('/admin/updates/'.$action,fn($r)=>$updates->$action($r));
@@ -33,7 +34,7 @@ final class Application {
   $app->post($base.'/wechat/confirm',function($r){if(!str_starts_with(strtolower($r->getHeaderLine('Content-Type')),'application/json'))throw new Problem('需要 JSON 请求');$this->requests->confirm((array)$r->getParsedBody(),Http::ip($r,$this->config));return Http::json(['message'=>'已处理，请返回网页继续']);});
   $app->addBodyParsingMiddleware();$app->addRoutingMiddleware();
   $app->add(function(Request $r,$handler)use($oidc){
-   $path=$r->getUri()->getPath();$api=str_starts_with($path,'/realms/52okp/wechat/')||str_contains($path,'/.well-known/')||(str_starts_with($path,$oidc)&&!in_array($path,[$oidc.'/auth',$oidc.'/logout'],true));
+   $path=$r->getUri()->getPath();$api=$path==='/api/spec'||str_starts_with($path,'/realms/52okp/wechat/')||str_contains($path,'/.well-known/')||(str_starts_with($path,$oidc)&&!in_array($path,[$oidc.'/auth',$oidc.'/logout'],true));
    try{
     if(strlen((string)$r->getBody())>65536)throw new Problem('请求过大',413);
     // Reject duplicate/array parameters before PHP's form parsing can collapse them.

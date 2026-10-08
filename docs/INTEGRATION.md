@@ -1,5 +1,7 @@
 # 业务网站接入 PHP 登录中枢
 
+在线文档：`https://open.52okp.com/api`；机器可读接口说明：`https://open.52okp.com/api/spec`（1.0.4 起提供）。
+
 Issuer：`https://open.52okp.com/realms/52okp`
 
 Discovery：`https://open.52okp.com/realms/52okp/.well-known/openid-configuration`
