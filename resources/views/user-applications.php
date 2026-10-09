@@ -1,0 +1,9 @@
+<?php $recorded=0;foreach($applicationOptions as $option)if(isset($member['applications'][$option['id']]))$recorded++; ?>
+<div class="admin-heading"><div><p class="eyebrow">USER APPLICATIONS</p><h1>用户应用记录</h1><p class="muted"><?= $e($member['display_name']) ?> · <?= $e($member['email']??$member['username']) ?></p></div><a class="button secondary button-small" href="/admin?section=users">返回用户列表</a></div>
+<section class="card"><div class="section-heading"><h2>注册来源</h2><span class="muted">注册时间 <?= $e(gmdate('Y-m-d H:i',(int)$member['created_at'])) ?> UTC</span></div><strong><?= $e($member['registration_platform']) ?></strong><p class="muted"><?= $e($member['registration_source']) ?></p></section>
+<section class="card"><div class="section-heading"><h2>各应用登录情况</h2><span class="muted">有记录 <?= $recorded ?> 个 · 暂无记录 <?= count($applicationOptions)-$recorded ?> 个</span></div>
+<p class="muted">“已签发登录凭证”表示应用已成功换取令牌；“已完成授权”表示账号中心已完成授权，但尚无换取令牌的记录。“暂无记录”也可能是历史记录已被清理。这里不代表业务平台已创建或同步账号。</p>
+<div class="table"><table><thead><tr><th>应用</th><th>登录记录</th><th>首次记录（UTC）</th><th>最近留存记录（UTC）</th></tr></thead><tbody>
+<?php foreach($applicationOptions as $option): $record=$member['applications'][$option['id']]??null; ?><tr><td><strong><?= $e($option['name']) ?></strong><small><?= $e($option['id']) ?><?= $option['enabled']?'':' · 已停用' ?></small></td><td><span class="status-pill <?= $record&&$record['exchanged']?'good':'neutral' ?>"><?= $record?($record['exchanged']?'已签发登录凭证':'已完成授权'):'暂无登录记录' ?></span></td><td><?= $record?$e(gmdate('Y-m-d H:i',(int)$record['first_at'])):'—' ?></td><td><?= $record?$e(gmdate('Y-m-d H:i',(int)$record['last_at'])):'—' ?></td></tr><?php endforeach ?>
+<?php if(!$applicationOptions): ?><tr><td colspan="4" class="muted">尚未登记应用，请先在应用接入中添加。</td></tr><?php endif ?>
+</tbody></table></div></section>

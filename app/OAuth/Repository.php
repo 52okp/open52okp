@@ -15,6 +15,7 @@ final class Repository implements R\ClientRepositoryInterface,R\ScopeRepositoryI
  public function persistNewAuthCode(E\AuthCodeEntityInterface $code):void {
   $u=$this->db->one('SELECT * FROM users WHERE id=? AND enabled=1 FOR UPDATE',[$code->getUserIdentifier()]);if(!$u)throw OAuthServerException::accessDenied('Account disabled');
   $this->db->run('INSERT INTO auth_codes (id,user_id,client_id,nonce,auth_time,session_version,expires_at) VALUES (?,?,?,?,?,?,?)',[$code->getIdentifier(),$u['id'],$code->getClient()->getIdentifier(),$this->context->claims['nonce']??'',time(),$u['session_version'],$code->getExpiryDateTime()->getTimestamp()]);
+  $this->rememberApplication('application.first-authorized',$u['id'],$code->getClient()->getIdentifier());
  }
  public function revokeAuthCode(string $id):void{$this->db->run('UPDATE auth_codes SET revoked=1 WHERE id=?',[$id]);}
  public function isAuthCodeRevoked(string $id):bool {
@@ -30,6 +31,11 @@ final class Repository implements R\ClientRepositoryInterface,R\ScopeRepositoryI
   $r=$this->context->claims;
   if(!$r||$r['user_id']!==$token->getUserIdentifier()||!$this->userValid($r))throw OAuthServerException::accessDenied('Account unavailable');
   $this->db->run('INSERT INTO access_tokens (id,user_id,client_id,scopes,nonce,auth_time,session_version,expires_at) VALUES (?,?,?,?,?,?,?,?)',[$token->getIdentifier(),$r['user_id'],$token->getClient()->getIdentifier(),json_encode(array_map(fn($s)=>$s->getIdentifier(),$token->getScopes()),JSON_THROW_ON_ERROR),$r['nonce'],$r['auth_time'],$r['session_version'],$token->getExpiryDateTime()->getTimestamp()]);
+  $this->rememberApplication('application.first-token',$r['user_id'],$token->getClient()->getIdentifier());
+ }
+ private function rememberApplication(string $event,string $user,string $client):void {
+  // Authorization/token issuance already holds the user row lock in the same transaction.
+  if(!$this->db->one('SELECT id FROM audit_events WHERE event=? AND user_id=? AND detail=? LIMIT 1',[$event,$user,$client]))$this->db->run('INSERT INTO audit_events(event,user_id,ip_hash,detail,created_at) VALUES(?,?,?,?,?)',[$event,$user,str_repeat('0',64),$client,time()]);
  }
  public function revokeAccessToken(string $id):void{$this->db->run('UPDATE access_tokens SET revoked=1 WHERE id=?',[$id]);}
  public function isAccessTokenRevoked(string $id):bool {

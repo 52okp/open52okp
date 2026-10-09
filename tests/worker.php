@@ -12,4 +12,5 @@ elseif($action==='exchange'){$response=$a->oauth()->token($r->withParsedBody($d[
 elseif($action==='wechat-enable'){$a->settings->put('test-wechat-backup',$a->settings->get('wechat'));$a->settings->put('wechat',['enabled'=>true,'app_id'=>'wx4ec45155a93041cc','secret'=>'isolated-test-only','page'=>'pages/account-confirm/index','env'=>'release']);echo '{}';}
 elseif($action==='wechat-restore'){$a->settings->put('wechat',$a->settings->get('test-wechat-backup'));echo '{}';}
 elseif($action==='wechat-confirm'){$wx=new Okp\Wechat($a->settings,$a->db,fn()=>['body'=>json_encode(['openid'=>'test-'.$d['ticket']]),'status'=>200]);$tickets=new Okp\LoginRequests($a->db,$a->crypto,$a->rate,$wx,$a->users);$tickets->confirm(['ticket'=>$d['ticket'],'code'=>'test-only','accepted'=>true,'decision'=>'confirm'],'isolated-http-test');echo '{}';}
+elseif($action==='directory-evidence'){$u=$a->db->one('SELECT id FROM users WHERE email=?',[$d['email']]);echo json_encode((new Okp\AdminUsers($a->db))->details($u['id'])['member']);}
 else throw new RuntimeException('Unknown test action');

@@ -64,7 +64,15 @@ final class WebController {
  }
  public function cancel(Request $r):ResponseInterface {$id=Http::input($r,'request');$t=$this->a->requests->bound($id,$this->a->browser->binding());$this->a->requests->cancel($id,$this->a->browser->binding());$payload=json_decode($t['payload'],true);if(isset($payload['oauth'])){$q=$payload['oauth'];$this->a->oauth()->validate($r->withQueryParams($q));return $this->browserRedirect(Http::redirect($q['redirect_uri'].(str_contains($q['redirect_uri'],'?')?'&':'?').http_build_query(['error'=>'access_denied','state'=>$q['state']])));}return Http::redirect('/');}
  public function emailForm(Request $r,string $purpose):ResponseInterface {
-  return $this->a->view->render('email-form',['title'=>$purpose==='register'?'注册账号':'找回密码','purpose'=>$purpose]);
+  $context=$purpose==='register'?$this->registrationContext($r,Http::query($r,'request')):null;
+  return $this->a->view->render('email-form',['title'=>$purpose==='register'?'注册账号':'找回密码','purpose'=>$purpose,'registrationRequest'=>$context['ticket']['id']??'','registrationPlatform'=>$context['name']??'52okp 账号中心']);
+ }
+ private function registrationContext(Request $r,string $id):?array {
+  if($id==='')return null;$t=$this->a->requests->bound($id,$this->a->browser->binding(),false,true);
+  if($t['intent']!=='LOGIN'||!in_array($t['state'],['WAITING','CONFIRMED'],true)||$t['created_at']<time()-1800)throw new Problem('注册来源请求已失效，请从应用重新发起',410);
+  $payload=json_decode($t['payload'],true);$name='52okp 账号中心';
+  if(isset($payload['oauth']))$name=$this->a->oauth()->validate($r->withQueryParams($payload['oauth']))['name'];
+  return ['ticket'=>$t,'payload'=>$payload,'name'=>$name];
  }
  public function sendCode(Request $r):ResponseInterface {
   $purpose=Http::input($r,'purpose');if($purpose==='link-email'){$u=$this->requireUser();$this->recent($u);}
@@ -72,9 +80,12 @@ final class WebController {
   return Http::json(['message'=>$purpose==='reset'?'如果该邮箱已验证且账号可用，验证码将发送至邮箱':'验证码已发送，5 分钟内有效']);
  }
  public function register(Request $r):ResponseInterface {
+  $context=$this->registrationContext($r,Http::input($r,'request'));
   $email=Users::email(Http::input($r,'email'));$password=Http::input($r,'password');Users::password($password);$name=trim(Http::input($r,'name'));if($name===''||mb_strlen($name)>80)throw new Problem('请输入 1～80 个字符的昵称');
   if(!$this->a->emails->consume($_SESSION['email_codes']['register']??'','register',$email,$this->a->browser->binding(),Http::input($r,'code')))throw new Problem('验证码无效、已过期或尝试次数过多');
-  $u=$this->a->users->create($email,$password,$name);$this->a->audit->log('user.registered',$u['id'],$this->ip($r));$this->a->browser->flash('注册成功，请登录');return Http::redirect('/login');
+  $u=$this->a->users->create($email,$password,$name,$context['payload']['oauth']['client_id']??null);$this->a->audit->log('user.registered',$u['id'],$this->ip($r));$this->a->browser->flash('注册成功，请登录');
+  if($context&&isset($context['payload']['oauth'])){$this->a->requests->cancel($context['ticket']['id'],$this->a->browser->binding());$created=$this->a->requests->create($this->a->browser->binding(),$context['payload'],$context['name'],$this->ip($r));$this->remember($created);return Http::redirect('/login?request='.$created['ticket']['id']);}
+  return Http::redirect('/login');
  }
  public function resetPassword(Request $r):ResponseInterface {
   $email=Users::email(Http::input($r,'email'));$password=Http::input($r,'password');Users::password($password);

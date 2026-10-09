@@ -36,7 +36,7 @@ final class LoginRequests {
  public function consume(string $id,string $binding):array {
   return $this->db->transaction(function()use($id,$binding){$t=$this->bound($id,$binding,true);if(!$this->validWechat($t)||$t['state']!=='CONFIRMED')throw new Problem('请先在小程序确认，或刷新二维码重试',409);
    $payload=json_decode($t['payload'],true);if($t['intent']==='LINK'){$target=$this->users->byId($t['target_user'],true);if(!$target||!$target['enabled']||(int)$target['session_version']!==($payload['target_version']??null))throw new Problem('绑定会话已失效，请重新登录',403);}
-   $u=$this->users->fromWechat($t['app_id'],$t['openid'],$t['intent']==='LINK'?$t['target_user']:null);
+   $u=$this->users->fromWechat($t['app_id'],$t['openid'],$t['intent']==='LINK'?$t['target_user']:null,$payload['oauth']['client_id']??null);
    $this->db->run("UPDATE login_requests SET state='CONSUMED' WHERE id=?",[$id]);return ['user'=>$u,'ticket'=>$t];
   });
  }

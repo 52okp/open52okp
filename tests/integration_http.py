@@ -48,7 +48,9 @@ s,b,h=request('/login/password',{'csrf':csrf,'request':ticket,'username':seed['e
 s,b,h=request('/admin');check(s==200 and 'id="members"' in b and '微信小程序' not in b,'admin defaults to users only');csrf=field(b,'csrf')
 s,b,h=request('/admin?section=clients');check(s==200 and 'action="/admin/client"' in b and 'id="members"' not in b,'clients section renders independently')
 s,b,h=request('/admin?section=settings');check(s==200 and '微信小程序' in b and '邮箱验证码' in b and 'id="members"' not in b,'service settings render independently')
-s,b,h=request('/admin?section=users&q=absent-account');check(s==200 and 'section=users&amp;page=' in b,'user search pagination retains section')
+s,b,h=request('/admin?section=users&q=absent-account');check(s==200 and 'name="section" value="users"' in b and 'name="q" value="absent-account"' in b and 'aria-disabled="true"' in b,'empty user search retains filters and has no nonexistent next page')
+s,b,h=request('/admin/user-applications?id='+seed['id']);check(s==200 and '各应用登录情况' in b and '注册来源' in b,'administrator can inspect user application records')
+s,b,h=request('/admin?client=missing-application');check(s==400,'unknown application filter rejected')
 s,b,h=request('/admin?section=unknown');check(s==404,'unknown admin section rejected')
 s,b,h=request('/admin/updates');check(s==200 and '程序更新' in b and 'open52okp' in b,'program update UI renders correct project');csrf=field(b,'csrf')
 s,b,h=request('/admin/updates/configure',{'token':'invalid'});check(s==403,'update configuration requires CSRF')
@@ -111,4 +113,21 @@ try:
  s,b,h=request('/login/cancel',{'csrf':csrf,'request':ticket});destination=html.unescape(re.search(r'data-login-redirect href="([^"]+)"',b).group(1));cancel=urllib.parse.parse_qs(urllib.parse.urlparse(destination).query)
  check(s==200 and cancel['error']==['access_denied'] and cancel['state']==[query['state']],'cancel returns to registered app through safe navigation')
 finally: worker({'action':'wechat-restore'})
+# Registration provenance comes from the browser-bound validated application ticket.
+s,b,h=request('/admin/user-applications?id='+seed['id']);check(s==403,'ordinary user cannot inspect administrator user directory')
+s,b,h=request('/account');csrf=field(b,'csrf');s,b,h=request('/logout',{'csrf':csrf})
+s,b,h=request('/admin/user-applications?id='+seed['id']);check(s==401,'anonymous user cannot inspect application history')
+query['state']=secrets.token_hex(16);query['nonce']=secrets.token_hex(16)
+s,b,h=request('/realms/52okp/protocol/openid-connect/auth?'+urllib.parse.urlencode(query));s,b,h=request(h['Location']);ticket=field(b,'request')
+check('/register?request='+ticket in b,'application login carries its validated ticket into registration link')
+s,b,h=request('/register?request='+ticket);csrf=field(b,'csrf');check(s==200 and field(b,'request')==ticket and '注册来源：并发测试' in b,'application registration form displays and retains original source')
+foreign=urllib.request.build_opener(NoRedirect())
+try: foreign_status=foreign.open(BASE+'/register?request='+ticket).code
+except urllib.error.HTTPError as e: foreign_status=e.code
+check(foreign_status==404,'foreign browser cannot reuse another browser registration source ticket')
+email='application-'+seed['id'][:8]+'@example.test';session=next(c.value for c in jar if c.name=='okp_dev');code=worker({'action':'email','session':session,'purpose':'register','email':email})['code']
+s,b,h=request('/register',{'csrf':csrf,'request':ticket,'email':email,'password':seed['password'],'name':'应用来源注册','code':code});check(s==303 and h['Location'].startswith('/login?request='),'application registration returns to a fresh login request for that app')
+new_path=h['Location'];evidence=worker({'action':'directory-evidence','email':email});check(evidence['registration_platform']=='并发测试' and evidence['registration_source']=='邮箱注册' and not evidence['applications'],'application registration preserves source without inventing an application login')
+s,b,h=request(new_path);csrf=field(b,'csrf');ticket=field(b,'request');s,b,h=request('/login/password',{'csrf':csrf,'request':ticket,'username':email,'password':seed['password']});destination=html.unescape(re.search(r'data-login-redirect href="([^"]+)"',b).group(1));returned=urllib.parse.parse_qs(urllib.parse.urlparse(destination).query)
+check(s==200 and returned['state']==[query['state']] and destination.startswith(flow['redirect_uri']+'?'),'registration preserves original application state and callback through login')
 print('Completed:',count,'HTTP/concurrency assertions.')

@@ -17,7 +17,7 @@ final class Application {
   $app->get('/register',fn($r)=>$web->emailForm($r,'register'));$app->get('/forgot-password',fn($r)=>$web->emailForm($r,'reset'));
   $docs=new ApiDocs($this);$app->get('/api',fn($r)=>$docs->page());$app->get('/api/spec',fn($r)=>Http::json($docs->spec()));
   $app->get('/privacy',fn($r)=>$this->view->render('privacy',['title'=>'账号与隐私说明']));
-  $app->get('/admin',fn($r)=>$admin->index($r));$app->post('/admin/user',fn($r)=>$admin->user($r));$app->post('/admin/client',fn($r)=>$admin->client($r));$app->post('/admin/settings',fn($r)=>$admin->settings($r));
+  $app->get('/admin',fn($r)=>$admin->index($r));$app->get('/admin/user-applications',fn($r)=>$admin->applications($r));$app->post('/admin/user',fn($r)=>$admin->user($r));$app->post('/admin/client',fn($r)=>$admin->client($r));$app->post('/admin/settings',fn($r)=>$admin->settings($r));
   $updates=new UpdatesController($this);$app->get('/admin/updates',fn($r)=>$updates->index($r));$app->get('/admin/updates/status',fn($r)=>$updates->status($r));foreach(['configure','check','install'] as $action)$app->post('/admin/updates/'.$action,fn($r)=>$updates->$action($r));
   $base='/realms/52okp';$oidc=$base.'/protocol/openid-connect';
   $app->get($base.'/account[/]',fn($r)=>Http::redirect('/account'));

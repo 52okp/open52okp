@@ -20,15 +20,15 @@ final class Users {
   if(!$ok||!$u||!$u['enabled']){$this->audit->log('login.password.failed',null,$ip);return null;}
   return $u;
  }
- public function create(string $email,string $password,string $name):array {
+ public function create(string $email,string $password,string $name,?string $sourceClient=null,string $method='email'):array {
   $email=self::email($email);self::password($password);$name=trim($name);if($name===''||mb_strlen($name)>80)throw new Problem('昵称需为 1～80 个字符');
-  $id=Crypto::uuid();
+  return $this->db->transaction(function()use($email,$password,$name,$sourceClient,$method){$id=Crypto::uuid();
   try{$this->db->run('INSERT INTO users (id,username,email,display_name,password_hash,email_verified,created_at,updated_at) VALUES (?,?,?,?,?,1,?,?)',[$id,$email,$email,$name,password_hash($password,PASSWORD_BCRYPT,['cost'=>12]),time(),time()]);}
   catch(\PDOException $e){if($e->getCode()==='23000')throw new Problem('该邮箱或账号已存在，请登录或找回密码');throw $e;}
-  return $this->byId($id);
+  $this->audit->registrationSource($id,$method,$sourceClient);return $this->byId($id);});
  }
- public function fromWechat(string $app,string $openid,?string $target=null):array {
-  return $this->db->transaction(function()use($app,$openid,$target){
+ public function fromWechat(string $app,string $openid,?string $target=null,?string $sourceClient=null):array {
+  return $this->db->transaction(function()use($app,$openid,$target,$sourceClient){
    if($target){$u=$this->byId($target,true);if(!$u||!$u['enabled'])throw new Problem('账号不可用',403);}
    $id=hash('sha256',$app."\0".$openid);
    // A dedicated unique-key row serializes identity creation, even when no identity exists yet.
@@ -36,7 +36,7 @@ final class Users {
    $identity=$this->db->one('SELECT * FROM identities WHERE id=? FOR UPDATE',[$id]);
    if($identity){if($target&&$identity['user_id']!==$target)throw new Problem('此微信已经绑定其他账号，不能自动合并',409);$u=$this->byId($identity['user_id'],true);if(!$u||!$u['enabled'])throw new Problem('该账号不可用',403);return $u;}
    if($target){if($this->db->one('SELECT id FROM identities WHERE user_id=? AND app_id=?',[$target,$app]))throw new Problem('当前账号已绑定其他微信，不能覆盖',409);$uid=$target;}
-   else{$uid=Crypto::uuid();$this->db->run('INSERT INTO users(id,username,display_name,created_at,updated_at) VALUES (?,?,?,?,?)',[$uid,'wx_'.Crypto::random(12),'微信用户',time(),time()]);}
+   else{$uid=Crypto::uuid();$this->db->run('INSERT INTO users(id,username,display_name,created_at,updated_at) VALUES (?,?,?,?,?)',[$uid,'wx_'.Crypto::random(12),'微信用户',time(),time()]);$this->audit->registrationSource($uid,'wechat',$sourceClient);}
    $this->db->run('INSERT INTO identities(id,app_id,openid,user_id) VALUES (?,?,?,?)',[$id,$app,$openid,$uid]);return $this->byId($uid);
   });
  }
