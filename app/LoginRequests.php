@@ -38,7 +38,7 @@ final class LoginRequests {
    $payload=json_decode($t['payload'],true);if($t['intent']==='LINK'){$target=$this->users->byId($t['target_user'],true);if(!$target||!$target['enabled']||(int)$target['session_version']!==($payload['target_version']??null))throw new Problem('绑定会话已失效，请重新登录',403);}
    $u=$this->users->fromWechat($t['app_id'],$t['openid'],$t['intent']==='LINK'?$t['target_user']:null,$payload['oauth']['client_id']??null);
    $this->db->run("UPDATE login_requests SET state='CONSUMED' WHERE id=?",[$id]);return ['user'=>$u,'ticket'=>$t];
-  });
+  },5);
  }
  public function cancel(string $id,string $binding):void{$this->db->transaction(function()use($id,$binding){$t=$this->bound($id,$binding,true,true);if(in_array($t['state'],['WAITING','CONFIRMED'],true))$this->db->run("UPDATE login_requests SET state='CANCELLED' WHERE id=?",[$id]);});}
 }

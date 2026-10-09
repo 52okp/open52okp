@@ -13,4 +13,5 @@ elseif($action==='wechat-enable'){$a->settings->put('test-wechat-backup',$a->set
 elseif($action==='wechat-restore'){$a->settings->put('wechat',$a->settings->get('test-wechat-backup'));echo '{}';}
 elseif($action==='wechat-confirm'){$wx=new Okp\Wechat($a->settings,$a->db,fn()=>['body'=>json_encode(['openid'=>'test-'.$d['ticket']]),'status'=>200]);$tickets=new Okp\LoginRequests($a->db,$a->crypto,$a->rate,$wx,$a->users);$tickets->confirm(['ticket'=>$d['ticket'],'code'=>'test-only','accepted'=>true,'decision'=>'confirm'],'isolated-http-test');echo '{}';}
 elseif($action==='directory-evidence'){$u=$a->db->one('SELECT id FROM users WHERE email=?',[$d['email']]);echo json_encode((new Okp\AdminUsers($a->db))->details($u['id'])['member']);}
+elseif($action==='wechat-user-create'){$u=$a->users->fromWechat($d['app'],$d['openid']);echo json_encode(['id'=>$u['id'],'display_name'=>$u['display_name']]);}
 else throw new RuntimeException('Unknown test action');

@@ -36,9 +36,19 @@ final class Users {
    $identity=$this->db->one('SELECT * FROM identities WHERE id=? FOR UPDATE',[$id]);
    if($identity){if($target&&$identity['user_id']!==$target)throw new Problem('此微信已经绑定其他账号，不能自动合并',409);$u=$this->byId($identity['user_id'],true);if(!$u||!$u['enabled'])throw new Problem('该账号不可用',403);return $u;}
    if($target){if($this->db->one('SELECT id FROM identities WHERE user_id=? AND app_id=?',[$target,$app]))throw new Problem('当前账号已绑定其他微信，不能覆盖',409);$uid=$target;}
-   else{$uid=Crypto::uuid();$this->db->run('INSERT INTO users(id,username,display_name,created_at,updated_at) VALUES (?,?,?,?,?)',[$uid,'wx_'.Crypto::random(12),'微信用户',time(),time()]);$this->audit->registrationSource($uid,'wechat',$sourceClient);}
+   else{$uid=Crypto::uuid();$name=$this->nextWechatName();$this->db->run('INSERT INTO users(id,username,display_name,created_at,updated_at) VALUES (?,?,?,?,?)',[$uid,'wx_'.Crypto::random(12),$name,time(),time()]);$this->audit->registrationSource($uid,'wechat',$sourceClient);}
    $this->db->run('INSERT INTO identities(id,app_id,openid,user_id) VALUES (?,?,?,?)',[$id,$app,$openid,$uid]);return $this->byId($uid);
-  });
+  },5);
+ }
+ private function nextWechatName():string {
+  // The persistent counter shares the account creation transaction; failed creation consumes no number.
+  $key='wechat-display-name-sequence';
+  $this->db->run('INSERT INTO settings(name,value) VALUES(?,?) ON DUPLICATE KEY UPDATE value=value',[$key,$this->crypto->encrypt(json_encode(['next'=>10052],JSON_THROW_ON_ERROR))]);
+  $row=$this->db->one('SELECT value FROM settings WHERE name=? FOR UPDATE',[$key]);
+  $state=json_decode($this->crypto->decrypt($row['value']),true,32,JSON_THROW_ON_ERROR);$number=$state['next']??null;
+  if(!is_int($number)||$number<10052||$number>=PHP_INT_MAX)throw new \RuntimeException('微信昵称编号状态无效，请管理员核查');
+  $this->db->run('UPDATE settings SET value=? WHERE name=?',[$this->crypto->encrypt(json_encode(['next'=>$number+1],JSON_THROW_ON_ERROR)),$key]);
+  return 'wx_'.$number;
  }
  public function verifyTotp(string $id,string $code,string $ip):bool {
   $this->rate->require('totp:'.$id,8,300);$this->rate->require('totp-ip:'.$ip,30,300);

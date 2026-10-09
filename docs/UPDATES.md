@@ -1,6 +1,6 @@
 # 程序在线更新（app.52okp.com）
 
-本项目已按 https://app.52okp.com/api/spec 接入统一更新 API v1。实读线上服务实现版本为 v1.4.5。项目标识 **open52okp**，当前程序版本 **1.0.7**；这两个版本号属于不同系统。本次用户管理更新要求从 1.0.6 升级，数据库结构不变。
+本项目已按 https://app.52okp.com/api/spec 接入统一更新 API v1。实读线上服务实现版本为 v1.4.5。项目标识 **open52okp**，当前程序版本 **1.0.8**；这两个版本号属于不同系统。本次微信默认昵称更新要求从 1.0.7 升级，数据库结构不变。
 
 ## 第一次配置
 
@@ -31,12 +31,12 @@
 
 ```sh
 composer install --no-dev --prefer-dist --optimize-autoloader
-python tools/build_update.py --version 1.0.7 --from 1.0.6 --notes docs/RELEASE-1.0.7.txt --output ../dist/updates/open52okp/1.0.7
+python tools/build_update.py --version 1.0.8 --from 1.0.7 --notes docs/RELEASE-1.0.8.txt --output ../dist/updates/open52okp/1.0.8
 ```
 
 构建器自动生成带内容指纹的 CSS/JS 文件，先写包内版本，再生成 ZIP，最后计算外部清单大小和 SHA-256。输出是 `open52okp-update.zip` 和 `update-manifest.json`；既有输出拒绝覆盖。
 
-在绑定的 GitHub 仓库创建 **v1.0.7 正式 Release**，上传这两份资产。再到更新中心拉取或上传相同文件，完成 GitHub 摘要校验，管理员点击发布。未发布草稿不能供客户端安装。发布后才会在本系统检查到新版。
+在绑定的 GitHub 仓库创建 **v1.0.8 正式 Release**，上传这两份资产。再到更新中心拉取或上传相同文件，完成 GitHub 摘要校验，管理员点击发布。未发布草稿不能供客户端安装。发布后才会在本系统检查到新版。
 
 初始交付的 1.0.1 更新资产用于建立发布基线（from=1.0.0）；已经装好 1.0.1 接入版的网站不会再次安装同版。1.0.3 修正版直接从 1.0.1 升级；已发布的历史版本资产不覆盖。
 

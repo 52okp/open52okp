@@ -107,7 +107,7 @@ try:
  s,b,h=request('/login/finish',{'csrf':csrf,'request':ticket});destination=html.unescape(re.search(r'data-login-redirect href="([^"]+)"',b).group(1));callback=urllib.parse.parse_qs(urllib.parse.urlparse(destination).query)
  check(s==200 and destination.startswith(flow['redirect_uri']+'?') and callback['state']==[query['state']],'QR completion preserves registered callback and original state')
  flow['code']=callback['code'][0];s,b,h=request('/realms/52okp/protocol/openid-connect/token',flow);check(s==200 and 'id_token' in json.loads(b),'QR callback code exchanges successfully with original PKCE')
- s,b,h=request('/account');csrf=field(b,'csrf');s,b,h=request('/login/finish',{'csrf':csrf,'request':ticket});check(s==409,'confirmed QR ticket cannot be consumed twice')
+ s,b,h=request('/account');check(bool(re.search(r'wx_[0-9]{5,}',b)) and '微信用户' not in b,'new mini-program account displays its numbered default nickname');csrf=field(b,'csrf');s,b,h=request('/account/profile',{'csrf':csrf,'name':'小程序自定义昵称'});check(s==303,'mini-program user can change their nickname');s,b,h=request('/account');check('小程序自定义昵称' in b,'custom mini-program nickname is displayed');csrf=field(b,'csrf');s,b,h=request('/login/finish',{'csrf':csrf,'request':ticket});check(s==409,'confirmed QR ticket cannot be consumed twice')
  query['state']=secrets.token_hex(16)
  s,b,h=request('/realms/52okp/protocol/openid-connect/auth?'+urllib.parse.urlencode(query));s,b,h=request(h['Location']);csrf=field(b,'csrf');ticket=field(b,'request')
  s,b,h=request('/login/cancel',{'csrf':csrf,'request':ticket});destination=html.unescape(re.search(r'data-login-redirect href="([^"]+)"',b).group(1));cancel=urllib.parse.parse_qs(urllib.parse.urlparse(destination).query)

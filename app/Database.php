@@ -12,9 +12,15 @@ final class Database {
  public function run(string $sql,array $args=[]):\PDOStatement{$s=$this->pdo->prepare($sql);$s->execute($args);return $s;}
  public function one(string $sql,array $args=[]):?array{return $this->run($sql,$args)->fetch()?:null;}
  public function all(string $sql,array $args=[]):array{return $this->run($sql,$args)->fetchAll();}
- public function transaction(callable $work):mixed {
+ public function transaction(callable $work,int $attempts=1):mixed {
   if($this->pdo->inTransaction())return $work();
-  $this->pdo->beginTransaction();
-  try{$result=$work();$this->pdo->commit();return $result;}catch(\Throwable $e){if($this->pdo->inTransaction())$this->pdo->rollBack();throw $e;}
+  for($attempt=1;;$attempt++){
+   $this->pdo->beginTransaction();
+   try{$result=$work();$this->pdo->commit();return $result;}catch(\Throwable $e){
+    if($this->pdo->inTransaction())$this->pdo->rollBack();
+    if(!($e instanceof \PDOException)||(string)$e->getCode()!=='40001'||(int)($e->errorInfo[1]??0)!==1213||$attempt>=max(1,min(5,$attempts)))throw $e;
+    usleep(10000*$attempt);
+   }
+  }
  }
 }
