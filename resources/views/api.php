@@ -2,7 +2,7 @@
 $d=$spec['discovery'];$issuer=$spec['issuer'];$base=$issuer.'/protocol/openid-connect';
 $code=function(string $id,string $text)use($e){echo '<div class="api-code"><button type="button" data-api-copy="'.$e($id).'" aria-label="复制 '.$e($id).'">复制</button><pre><code id="'.$e($id).'">'.$e($text).'</code></pre></div>';};
 ?>
-<link rel="stylesheet" href="/assets/api-docs.f961a9e3544f9105.css"><script src="/assets/api-docs.449c73ff97380767.js" defer></script>
+<link rel="stylesheet" href="/assets/<?= $e($assets['api-docs.css']) ?>"><script src="/assets/api-docs.449c73ff97380767.js" defer></script>
 <div class="api-intro"><span class="api-tag">开发者文档 · OIDC</span><h1>接入 52okp 统一登录</h1><p>让你的业务网站使用同一套账号。账号密码与微信扫码在中枢完成，业务网站获取经过验证的用户身份。</p><div class="actions"><a class="button" href="#quickstart">开始接入</a><a href="/api/spec">JSON 接口说明 ↗</a><a href="<?= $e($spec['discovery_url']) ?>">OIDC 发现配置 ↗</a></div></div>
 <div class="api-docs"><nav class="api-toc" aria-label="API 文档目录"><?php foreach(['quickstart'=>'接入准备','endpoints'=>'接口地址','authorize'=>'发起登录','callback'=>'回调与换码','userinfo'=>'获取用户资料','refresh'=>'刷新与撤销','logout'=>'退出登录','errors'=>'错误排查','checklist'=>'联调检查'] as $id=>$label): ?><a href="#<?= $id ?>"><?= $label ?></a><?php endforeach ?></nav><div class="api-body">
 <p class="muted api-copy-status" data-api-copy-status role="status">示例中的客户端、域名和令牌均为占位值，请替换为你自己的配置。</p>

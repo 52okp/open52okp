@@ -4,7 +4,8 @@ from pathlib import Path
 import hashlib, json, zipfile
 root=Path(__file__).resolve().parents[1]
 out=root.parent/'dist';out.mkdir(exist_ok=True)
-archive=out/'52okp-account-php-1.0.5.zip'
+version=(root/'VERSION').read_text(encoding='utf-8').strip()
+archive=out/('52okp-account-php-'+version+'.zip')
 files=[]
 for path in root.rglob('*'):
  if not path.is_file():continue
